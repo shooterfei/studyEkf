@@ -1,0 +1,25 @@
+[project]
+name = "python"
+version = "0.1.0"
+description = ""
+authors = [{ name = "shooterfei", email = "shooterfei@163.com" }]
+license-expression = "MIT"
+dependencies = [
+  "opencv-python>=4.5.5.64",
+  "opencv-contrib-python>=4.5.5.64",
+  "kafka-python>=2.0.2",
+]
+requires-python = ">=3.10"
+
+[project.urls]
+Homepage = ""
+
+[tool.pdm]
+
+[build-system]
+requires = ["pdm-pep517>=0.12.0"]
+build-backend = "pdm.pep517.api"
+
+[tool.pyright]
+extraPaths = ["__pypackages__/3.10/lib/"]
+# exclude = "__pypackages__"
