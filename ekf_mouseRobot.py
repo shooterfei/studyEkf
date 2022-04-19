@@ -8,13 +8,16 @@ Copyright (C) 2016 Simon D. Levy
 
 MIT License
 """
+import json
 import threading
+import angluar
 
 import cv2
 # import math
-import time           # 引入time模块
+import time  # 引入time模块
 import numpy as np
 from sys import exit
+from kafka import KafkaConsumer
 
 from RobotEKF import RobotEKF
 
@@ -26,6 +29,9 @@ WINDOW_NAME = 'Kalman Mousetracker [ESC to quit]'
 WINDOW_SIZE = 800
 
 LINE_AA = cv2.LINE_AA  # if cv2.__version__[0] == '3' else cv2.CV_AA
+consumer = KafkaConsumer('test', bootstrap_servers='localhost:9092',
+                         auto_offset_reset='latest')
+
 
 class MouseInfo(object):
     """
@@ -40,7 +46,7 @@ class MouseInfo(object):
         self.v_y = 0
         self.last_v_x = 0
         self.last_v_y = 0
-        self.a_x = 0   # V1 = V0 + at   -> a = (v1-v0)/t
+        self.a_x = 0  # V1 = V0 + at   -> a = (v1-v0)/t
         self.a_y = 0
 
     def __str__(self):
@@ -62,7 +68,7 @@ def mouseCallback(event, x, y, flags, mouse_info):
     # mouse_info.a_y = 0
     now = time.time()
     if mouse_info.last_x > 0 and mouse_info.last_y > 0:
-        t = (now*1000 - mouse_info.last_time)  # 转ms
+        t = (now * 1000 - mouse_info.last_time)  # 转ms
         # print(f"mouseCallback: t={t}")
         # print(f"mouseCallback: now={now}")
         # print(f"mouseCallback: mouse_info.last_time={mouse_info.last_time}")
@@ -70,7 +76,7 @@ def mouseCallback(event, x, y, flags, mouse_info):
         if t > DELAY_MSEC:
             # s = math.sqrt(math.pow((x-mouse_info.last_x), 2) + math.pow((y-mouse_info.last_y), 2))
             # t = t/1000  # 不做ms 转 s,  单位按 pixels/ms算
-            mouse_info.v_x = (x-mouse_info.last_x) / t
+            mouse_info.v_x = (x - mouse_info.last_x) / t
             mouse_info.v_y = (y - mouse_info.last_y) / t
 
             # print(f"mouseCallback:  mouse_info.v_x={mouse_info.v_x}")
@@ -127,12 +133,31 @@ def newImage():
 
     return np.zeros((WINDOW_SIZE, WINDOW_SIZE, 3), np.uint8)
 
+
 def loop():
-    while True:
-        print(mouse_info.x)
-        mouse_info.x += ()
-        mouse_info.y += 20
-        time.sleep(0.050)
+    try:
+        for msg in consumer:
+            m = json.loads(msg.value)
+            if ('obj' in m):
+                acceleration = m['obj']['acceleration']
+                gravitys = m['obj']['gravitys']
+                angularVelocity = m['obj']['angularVelocity']
+                airHorn = m['obj']['airHorn']
+                print(" 加速度: \t%s \n 重力加速度: \t%s \n 角速度: \t%s \n 航向角: \t%s \n " % (
+                acceleration, gravitys, angularVelocity,
+                airHorn))
+
+            # if (m.has_key('obj'))
+            # print(msg.value.decode('utf-8'))
+            # print("%s:%d:%d: key=%s value=%s" % (msg.topic, msg.partition, msg.offset, msg.key, msg.value))
+    except KeyboardInterrupt as e:
+        print(e)
+    # while True:
+    #
+    #     print(mouse_info.x)
+    #     mouse_info.x += ()
+    #     mouse_info.y += 20
+    #     time.sleep(0.050)
 
 
 if __name__ == '__main__':
@@ -145,7 +170,6 @@ if __name__ == '__main__':
     mouse_info = MouseInfo()
     # cv2.setMouseCallback(WINDOW_NAME, mouseCallback, mouse_info)
 
-
     mouse_info.x = 100
     mouse_info.y = 100
     mouse_info.a_x = 1
@@ -154,7 +178,8 @@ if __name__ == '__main__':
     mouse_info.v_y = 0
     # Loop until mouse inside window
 
-    t = threading.Thread(target=loop, name="ThreadName" )
+    t = threading.Thread(target=loop, name="ThreadName")
+    t.daemon = True
     t.start()
 
     # These will get the trajectories(轨迹) for mouse location and Kalman estimate(估计)
@@ -177,7 +202,8 @@ if __name__ == '__main__':
         kalfilt.update_acceleration(mouse_info.a_x, mouse_info.a_y)
 
         # Update the Kalman filter with the mouse point, getting the estimate.
-        estimate = kalfilt.step((mouse_info.x, mouse_info.v_x, mouse_info.y, mouse_info.v_y))  # 输入当前鼠标位置测量值,  返回新的鼠标位置最优评估值
+        estimate = kalfilt.step(
+            (mouse_info.x, mouse_info.v_x, mouse_info.y, mouse_info.v_y))  # 输入当前鼠标位置测量值,  返回新的鼠标位置最优评估值
 
         # print(f"estimate={estimate}")
         # Add the estimate to the trajectory
@@ -196,5 +222,4 @@ if __name__ == '__main__':
         cv2.imshow(WINDOW_NAME, img)
         if cv2.waitKey(DELAY_MSEC) & 0xFF == 27:
             break
-
     t.join()

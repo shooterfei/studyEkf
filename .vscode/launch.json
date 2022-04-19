@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: angluar.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/angluar.py",
+            "console": "integratedTerminal",
+            "env": {"PYTHONPATH": "__pypackages__/3.10/lib"}
+        }
+    ]
+}
